@@ -4,7 +4,9 @@ Prüft Websites nach **WCAG 2.2 Stufe AA** und ordnet jeden Befund der **EN 301 
 
 | | |
 | --- | --- |
-| Konzept | [docs/konzept.md](docs/konzept.md) |
+| Konzept (vollständig) | [docs/konzept-vollstaendig.md](docs/konzept-vollstaendig.md) |
+| Konzept (Kurzfassung) | [docs/konzept.md](docs/konzept.md) |
+| Recherche Skills & Plugins | [docs/skills-und-plugins.md](docs/skills-und-plugins.md) |
 | Prüfkatalog | [docs/pruefkatalog.md](docs/pruefkatalog.md) |
 | Berichtsvorlage | [docs/bericht-vorlage.md](docs/bericht-vorlage.md) |
 | Lint-Vorlagen | [templates/lint/](templates/lint/) |

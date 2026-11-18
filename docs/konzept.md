@@ -2,7 +2,7 @@
 
 Der Supertest prüft Websites gegen **WCAG 2.2 Stufe AA**. Damit sind WCAG 2.1 AA und die Web-Anforderungen der EN 301 549 (Kapitel 9) abgedeckt, auf die das Barrierefreiheitsstärkungsgesetz (BFSG) verweist.
 
-Das ausführliche, kommentierbare Konzept liegt als Claude-Dokument vor; diese Datei ist die Arbeitsfassung im Repository.
+Diese Datei ist die Kurzfassung für die Arbeit im Repository. Die vollständige Fassung steht in [konzept-vollstaendig.md](konzept-vollstaendig.md), die Werkzeug-Recherche in [skills-und-plugins.md](skills-und-plugins.md).
 
 ## Modi
 
