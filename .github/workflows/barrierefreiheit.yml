@@ -1,0 +1,65 @@
+# Phase 7 des Supertests: Regressionstest in der CI.
+#
+# Ziel-URL: Repository-Variable A11Y_BASE_URL (Settings → Secrets and variables → Actions → Variables)
+# oder beim manuellen Start eingeben. Ohne URL wird die mitgelieferte Demo-Seite geprüft.
+name: Barrierefreiheit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *' # nächtlich, Volltest aller konfigurierten Seiten
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Zu prüfende URL (leer = Repository-Variable bzw. Demo)'
+        required: false
+      formulare_absenden:
+        description: 'Formulare leer absenden (nur Staging!)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  supertest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_URL: ${{ inputs.base_url || vars.A11Y_BASE_URL }}
+      A11Y_FORMS_SUBMIT: ${{ inputs.formulare_absenden && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Abhängigkeiten installieren
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Supertest ausführen
+        id: tests
+        run: npx playwright test
+
+      - name: Bericht erzeugen
+        if: always()
+        run: |
+          node scripts/report.ts || true
+          if [ -f reports/bericht.md ]; then cat reports/bericht.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Bericht und Playwright-Report hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: barrierefreiheit-${{ github.run_number }}
+          path: |
+            reports/
+            playwright-report/
+            tests/__snapshots__/
+          retention-days: 30

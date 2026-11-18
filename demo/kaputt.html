@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo – absichtlich fehlerhafte Seite</title>
+  <!--
+    Diese Seite enthält ABSICHTLICH Barrieren. Sie dient dem Selbsttest:
+    npm run selbsttest  →  muss Befunde liefern und fehlschlagen.
+  -->
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .breit { width: 900px; }
+    .blass { color: #b5b5b5; }
+    button:focus, a:focus { outline: none; }
+    .karte { height: 2.6em; overflow: hidden; width: 14em; line-height: 1.2; }
+    .banner { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #222; color: #fff; padding: 1rem; }
+    .fake-button { display: inline-block; padding: 0.5rem; background: #ddd; cursor: pointer; }
+    .lang { height: 1400px; }
+  </style>
+</head>
+<body>
+  <div class="breit">
+    <h1>Fehlerhafte Beispielseite</h1>
+    <p class="blass">Dieser Text hat zu wenig Kontrast.</p>
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='80'/%3E" width="200" height="80">
+    <p><button>Ohne Fokusrahmen</button> <a href="#x">Link ohne Fokusrahmen</a></p>
+    <p><span class="fake-button" onclick="alert('geklickt')">Absenden (div-Button)</span></p>
+    <div class="karte">Dieser Text passt knapp in die Karte hinein.</div>
+    <input type="text" placeholder="Feld ohne Label">
+    <input type="password" onpaste="return false" placeholder="Passwort">
+    <div class="lang"></div>
+    <p><a href="#unten-1">Link unter dem Banner 1</a></p>
+    <p><a href="#unten-2">Link unter dem Banner 2</a></p>
+    <p><input id="falle" aria-label="Tastaturfalle"></p>
+    <p><a href="#danach">Unerreichbar nach der Falle</a></p>
+  </div>
+  <div class="banner">Cookie-Banner, das den unteren Bildschirmrand verdeckt.</div>
+  <script>
+    document.getElementById('falle').addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') e.preventDefault();
+    });
+  </script>
+</body>
+</html>
