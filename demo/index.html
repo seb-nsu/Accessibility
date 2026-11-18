@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo – barrierefreie Beispielseite</title>
+  <style>
+    :root { --text: #1a1a1a; --bg: #ffffff; --akzent: #0b5cad; --fehler: #b00020; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 1rem/1.5 system-ui, sans-serif; color: var(--text); background: var(--bg); }
+    a { color: var(--akzent); text-decoration: underline; }
+    :focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+    .skip { position: absolute; left: 0.5rem; top: -3rem; background: var(--bg); padding: 0.5rem 1rem; }
+    .skip:focus { top: 0.5rem; }
+    header, main, footer { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+    header { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+    nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; margin: 0; padding: 0; }
+    nav ul[hidden] { display: none; }
+    button { font: inherit; min-height: 2.75rem; padding: 0.5rem 1rem; border: 2px solid var(--akzent); background: var(--bg); color: var(--akzent); border-radius: 0.25rem; cursor: pointer; }
+    label { display: block; font-weight: 600; margin-top: 1rem; }
+    input, textarea { font: inherit; width: 100%; max-width: 30rem; padding: 0.5rem; border: 2px solid #595959; border-radius: 0.25rem; }
+    [aria-invalid="true"] { border-color: var(--fehler); }
+    .fehler { color: var(--fehler); margin: 0.25rem 0 0; }
+    img { max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+  <header>
+    <a href="/">Startseite</a>
+    <button type="button" aria-expanded="false" aria-controls="menue" id="menueknopf">Menü</button>
+    <nav aria-label="Hauptnavigation">
+      <ul id="menue" hidden>
+        <li><a href="#leistungen">Leistungen</a></li>
+        <li><a href="#kontakt">Kontakt</a></li>
+        <li><a href="#hilfe">Hilfe</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="inhalt" tabindex="-1">
+    <h1>Barrierefreie Beispielseite</h1>
+    <p>Diese Seite dient als Referenz für den Supertest. Sie sollte alle automatischen Prüfungen bestehen.</p>
+
+    <h2 id="leistungen">Leistungen</h2>
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='120'%3E%3Crect width='320' height='120' fill='%230b5cad'/%3E%3C/svg%3E"
+         width="320" height="120" alt="Blaue Fläche als Platzhalter für ein Produktbild">
+    <ul>
+      <li>Beratung</li>
+      <li>Umsetzung</li>
+      <li>Prüfung nach WCAG 2.2 AA</li>
+    </ul>
+
+    <h2 id="kontakt">Kontakt</h2>
+    <form id="kontaktformular" novalidate>
+      <label for="name">Name (Pflichtfeld)</label>
+      <input id="name" name="name" autocomplete="name" required aria-describedby="name-fehler">
+      <p id="name-fehler" class="fehler" hidden>Bitte geben Sie Ihren Namen ein.</p>
+
+      <label for="email">E-Mail (Pflichtfeld)</label>
+      <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-fehler">
+      <p id="email-fehler" class="fehler" hidden>Bitte geben Sie eine gültige E-Mail-Adresse ein, z. B. name@beispiel.de.</p>
+
+      <label for="passwort">Passwort</label>
+      <input id="passwort" name="passwort" type="password" autocomplete="current-password">
+
+      <label for="nachricht">Nachricht</label>
+      <textarea id="nachricht" name="nachricht" rows="4"></textarea>
+
+      <p><button type="submit">Absenden</button></p>
+      <div role="status" id="status"></div>
+    </form>
+
+    <h2 id="hilfe">Hilfe</h2>
+    <p>Fragen? <a href="mailto:hilfe@beispiel.de">Schreiben Sie uns eine E-Mail an hilfe@beispiel.de</a>.</p>
+  </main>
+
+  <footer>
+    <p>© Beispiel GmbH · <a href="#hilfe">Hilfe</a></p>
+  </footer>
+
+  <script>
+    const knopf = document.getElementById('menueknopf');
+    const menue = document.getElementById('menue');
+    knopf.addEventListener('click', () => {
+      const offen = knopf.getAttribute('aria-expanded') === 'true';
+      knopf.setAttribute('aria-expanded', String(!offen));
+      menue.hidden = offen;
+    });
+
+    const form = document.getElementById('kontaktformular');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      let fehler = 0;
+      for (const feld of form.querySelectorAll('[required]')) {
+        const ok = feld.value.trim() !== '' && feld.checkValidity();
+        feld.setAttribute('aria-invalid', String(!ok));
+        document.getElementById(feld.id + '-fehler').hidden = ok;
+        if (!ok) fehler++;
+      }
+      document.getElementById('status').textContent = fehler
+        ? `${fehler} Feld(er) fehlerhaft. Bitte korrigieren.`
+        : 'Danke, Ihre Nachricht wurde gesendet.';
+      if (fehler) form.querySelector('[aria-invalid="true"]').focus();
+    });
+  </script>
+</body>
+</html>
