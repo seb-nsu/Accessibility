@@ -35,12 +35,12 @@ Community-Skills vor der Installation lesen (SKILL.md) – sie sind nicht von An
 flowchart TD
   P1["1 · Umfang festlegen<br/>Modus, Seitentypen, Abläufe, Zustände"]
   P2a["2a · Code-Scan<br/>eaa-audit, Lint"]
-  P2b["2b · Live-Scan<br/>npm test (axe + Skripte)"]
+  P2b["2b · Live-Scan<br/>npm test (axe desktop + mobil, Skripte,<br/>Kontrast-/Dunkelmodus)"]
   P3["3 · Abgleich<br/>Duplikate zusammenführen, Live ↔ Code"]
   P4["4 · Manuelle Prüfung<br/>Kandidaten + Restliste aus dem Bericht"]
   P5["5 · Bericht<br/>npm run report"]
   P6["6 · Beheben und Re-Test"]
-  P7["7 · Regressionstest in der CI<br/>.github/workflows/barrierefreiheit.yml"]
+  P7["7 · Regressionstest in der CI<br/>Baseline, PR-Vergleich, Selbsttest"]
   P1 --> P2a & P2b --> P3 --> P4 --> P5 --> P6
   P6 -- Befund offen --> P2b
   P6 -- alles bestanden --> P7
@@ -63,10 +63,19 @@ flowchart TD
 ### Phase 7: Regressionstest in der CI
 
 1. **Beim Schreiben:** Lint-Regeln im Editor und als Pre-Commit-Hook.
-2. **Bei jedem Pull Request:** `npm test` – axe-Scan, Tastatur-, Layout-, Formular-Skripte, Tree-Snapshot.
-3. **Auswertung:** Neuer sicherer Befund *Kritisch* oder *Hoch* lässt den Build fehlschlagen. Snapshot-Abweichung → nur diese Stelle manuell prüfen.
-4. **Nächtlich:** Volltest-Scan, Bericht als Artefakt und in der Job-Zusammenfassung.
+2. **Bei jedem Pull Request:** `npm test` – axe (desktop + mobil), Tastatur-, Hover-, Eingabe-, Layout-, Formular-Skripte, Kontrast-/Dunkelmodus, Tree-Snapshot; zusätzlich der Selbsttest.
+3. **Auswertung:** Neuer sicherer Befund *Kritisch* oder *Hoch* lässt den Build fehlschlagen, außer er steht mit gültigem Datum in der Baseline. Snapshot-Abweichung → nur diese Stelle manuell prüfen. PR-Kommentar mit Vergleich zu `main`, Befunde im Code Scanning.
+4. **Nächtlich:** Volltest, mit `A11Y_SITEMAP=true` je Seitenvorlage eine Seite aus der Sitemap; Bericht als Artefakt und in der Job-Zusammenfassung.
 5. **Pro Release:** KI-Vorprüfung geänderter Inhalte (Alt-Texte, Linktexte, Fehlermeldungen) mit dem Skill `a11y-supertest`; ein Mensch bestätigt.
+
+### Optimierungen (26.11.2026)
+
+- **Korrektheit:** modale Dialoge sind keine Tastaturfalle mehr; Fokus mit Kontrast-Schwelle; Selbsttest in der CI; Lock-Datei und Dependabot.
+- **Abdeckung:** neu 1.4.11, 1.4.13, 3.2.1, 3.2.2, 3.2.6, 4.1.3 (opt-in); Kontrastmodus, Dunkelmodus, mobil.
+- **Praxis:** Baseline für Altfehler, Sitemap, PR-Kommentar, SARIF.
+- **Geschwindigkeit:** ein Test pro Seite, 4 Worker, Caches.
+
+Details: [konzept-vollstaendig.md](konzept-vollstaendig.md#optimierungen-stand-26112026).
 
 ### Was manuell bleibt
 

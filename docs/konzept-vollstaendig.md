@@ -1,6 +1,6 @@
 # Barrierefreiheits-Supertest – Konzept
 
-Stand: 18.11.2026 · Vollständige Fassung des Claude-Dokuments [„Barrierefreiheits-Supertest – Konzept“](https://claude.ai/artifact/G496eLvKR7gnZ8M4pv6KiX). Die Kurzfassung für die Arbeit im Repository steht in [konzept.md](konzept.md).
+Stand: 26.11.2026 · Hervorgegangen aus dem Claude-Dokument [„Barrierefreiheits-Supertest – Konzept“](https://claude.ai/artifact/G496eLvKR7gnZ8M4pv6KiX) (Stand 18.11.2026, seither nicht weiter gepflegt). **Maßgeblich ist diese Datei im Repository.** Die Kurzfassung steht in [konzept.md](konzept.md), Bedienung und Befehle in der [README](../README.md).
 
 ## Ziel und Geltungsbereich
 
@@ -43,12 +43,12 @@ Community-Skills vor der Installation lesen (SKILL.md). Sie sind nicht von Anthr
 flowchart TD
   P1["1 · Umfang festlegen<br/>Modus: Code, Live oder kombiniert<br/>Seitentypen, kritische Abläufe, Zustände"]
   P2a["2a · Code-Scan<br/>eaa-audit: WCAG + EN 301 549, Datei:Zeile<br/>a11y-audit: A/AA-Katalog, Lint im CI"]
-  P2b["2b · Live-Scan<br/>axe-core über Axe-Plugin, alle Seitentypen<br/>WebAbility zum Gegenprüfen"]
+  P2b["2b · Live-Scan<br/>npm test: axe desktop + mobil, Tastatur-, Hover-,<br/>Layout-, Formular-Skripte, Kontrast-/Dunkelmodus"]
   P3["3 · Abgleich<br/>Doppelte Befunde zusammenführen<br/>Live-Befund mit Code-Stelle verknüpfen"]
   P4["4 · Manuelle Prüfung (Schwerpunkt)<br/>Tastatur, Fokus, Fallen, Zoom 200 %, 320 px<br/>Accessibility-Tree, Alt-Texte, Formulare<br/>Neu in 2.2: 2.4.11, 2.5.7, 2.5.8, 3.3.8"]
   P5["5 · Bericht<br/>Schweregrad, WCAG- und EN-Bezug je Befund<br/>Ergebnis je Seite: konform, teilweise, nicht"]
   P6["6 · Beheben und Re-Test<br/>Fixes umsetzen<br/>betroffene Kriterien erneut prüfen"]
-  P7["7 · Regressionstest in der CI<br/>Lint, axe, Tastatur-Skripte, Tree-Snapshots<br/>bei jedem Pull Request, dauerhaft"]
+  P7["7 · Regressionstest in der CI<br/>Supertest, Snapshots, Baseline, PR-Vergleich,<br/>Selbsttest; nächtlich per Sitemap"]
   P1 --> P2a & P2b
   P2a & P2b --> P3 --> P4 --> P5 --> P6
   P6 -- Befund offen --> P2b
@@ -140,14 +140,51 @@ Ziel: Die manuelle Prüfung schrumpft auf Urteilsfragen und auf das, was sich se
 ### Phase 7: Regressionstest in der CI
 
 1. **Beim Schreiben:** Lint-Regeln im Editor und als Pre-Commit-Hook.
-2. **Bei jedem Pull Request:** Lint, Komponententests mit axe, Playwright-Lauf über die Pilotseiten und kritischen Abläufe in allen Zuständen: axe-Scan, Tastatur-Skripte, Mess-Skripte, Tree-Snapshot.
-3. **Auswertung:** Neuer Befund *Kritisch* oder *Hoch* lässt den Build fehlschlagen. Eine Snapshot-Abweichung erzeugt eine Review-Aufgabe, die nur diese Stelle manuell prüft (Phase 4 im Kleinen).
-4. **Nächtlich oder wöchentlich:** axe-Scan aller Seiten aus der Sitemap, Ergebnis als Trend-Bericht.
+2. **Bei jedem Pull Request:** Lint, Komponententests mit axe, Playwright-Lauf über die Pilotseiten und kritischen Abläufe in allen Zuständen (desktop und mobil): axe-Scan, Tastatur-, Hover-, Eingabe-, Layout- und Formular-Skripte, Kontrast- und Dunkelmodus, Tree-Snapshot. Dazu der Selbsttest, der prüft, dass der Supertest seine eigenen Testfehler findet.
+3. **Auswertung:** Neuer Befund *Kritisch* oder *Hoch* lässt den Build fehlschlagen – außer er steht mit gültigem Datum in der Baseline. Eine Snapshot-Abweichung erzeugt eine Review-Aufgabe, die nur diese Stelle manuell prüft (Phase 4 im Kleinen). Der PR bekommt einen Kommentar mit dem Vergleich zu `main`, die Befunde erscheinen im Code Scanning.
+4. **Nächtlich:** Volltest; mit `A11Y_SITEMAP=true` je Seitenvorlage eine Seite aus der Sitemap.
 5. **Pro Release:** KI-Vorprüfung der geänderten Inhalte (Alt-Texte, Linktexte, Fehlermeldungen); ein Mensch bestätigt die markierten Fälle.
 
 ### Was manuell bleibt
 
-Echte Screenreader-Nutzung kritischer Abläufe, das abschließende Urteil über Alt-Texte und Verständlichkeit, die Qualität von Untertiteln, Ziehbewegungen (2.5.7), redundante Eingaben (3.3.7), Blitzen (2.3.1) und eigene komplexe Widgets. Diese Prüfungen laufen im Volltest und für neue oder geänderte Komponenten, nicht bei jedem Release.
+Echte Screenreader-Nutzung kritischer Abläufe, das abschließende Urteil über Alt-Texte und Verständlichkeit, die Qualität von Untertiteln, Ziehbewegungen (2.5.7), redundante Eingaben (3.3.7), Blitzen (2.3.1), Zeit/Bewegung (2.2.x) und eigene komplexe Widgets – außerdem die Bewertung aller Kandidaten. Diese Prüfungen laufen im Volltest und für neue oder geänderte Komponenten, nicht bei jedem Release. Kontrast- und Dunkelmodus werden per Browser-Emulation geprüft; echte Betriebssystem-Einstellungen können im Detail abweichen.
+
+## Optimierungen (Stand 26.11.2026)
+
+Nach der ersten Umsetzung wurde der Supertest in vier Paketen verbessert ([PR #2](https://github.com/seb-nsu/Accessibility/pull/2)). Ziel: weniger Fehlalarme, mehr automatisch geprüfte Kriterien, Einsatz auf bestehenden Websites ohne sofort roten Build, kürzere Laufzeit.
+
+### 1. Korrektheit
+
+| Problem vorher | Folge | Lösung |
+| --- | --- | --- |
+| Fokus in einem modalen Dialog wurde als Tastaturfalle gewertet | Fehlalarm „Kritisch“ auf fast jeder Website mit Dialogen | Kreisen innerhalb von `aria-modal="true"` / `<dialog>` ist erlaubt; geprüft wird stattdessen, ob Esc schließt und der Fokus zum Auslöser zurückkehrt (Kandidat) |
+| „Fokus sichtbar“ galt schon bei einem geänderten Pixel | kaum sichtbare Fokusstile gingen durch | Bildvergleich zählt Pixel mit Kontrast ≥ 3:1; unter 25 % des Element-Umfangs → Kandidat „schwach sichtbar“ |
+| Prüfskripte selbst wurden nicht getestet | ein kaputter Test fällt niemandem auf | CI-Job **Selbsttest**: `demo/kaputt.html` muss 21 erwartete Befunde liefern, die saubere Demo keinen sicheren Befund |
+| keine Lock-Datei | neue Versionen verändern Ergebnisse unbemerkt | `package-lock.json` per Workflow, Updates über Dependabot als eigener PR |
+
+### 2. Abdeckung
+
+| Neu | Kriterium | Wie |
+| --- | --- | --- |
+| Nicht-Text-Kontrast | 1.4.11 | Rahmen bzw. Fläche von Eingabefeldern gegen die Umgebung, Grenze 3:1 |
+| Hover-/Fokus-Inhalte | 1.4.13 | Tooltip auslösen → per Esc ausblendbar? Bleibt er beim Darüberfahren? |
+| Kontextwechsel | 3.2.1, 3.2.2 | Seitenwechsel/neues Fenster beim Fokussieren bzw. beim Ändern einer Auswahl |
+| Konsistente Hilfe | 3.2.6 | Bericht vergleicht die Position von Hilfe/Kontakt über alle Seiten |
+| Statusmeldungen | 4.1.3 | beim (opt-in) Absenden: sichtbare Meldung außerhalb einer Live-Region |
+| Kontrastmodus | 2.4.7 | Fokus unter `forced-colors` (z. B. nur `box-shadow` verschwindet) |
+| Dunkelmodus | 1.4.3 | Kontrastprüfung unter `prefers-color-scheme: dark`, falls die Seite ihn anbietet |
+| Mobil | u. a. 2.5.8 | axe zusätzlich im Projekt `mobil` (Pixel 7, Touch) |
+
+### 3. Praxis
+
+- **Baseline** (`a11y-baseline.json`, `npm run baseline`): Altfehler einer bestehenden Website werden mit Ticket und Ablaufdatum erfasst. Danach blockieren nur neue Fehler; abgelaufene Einträge blockieren wieder.
+- **Sitemap** (`npm run sitemap`): je Seitenvorlage (Pfadmuster) eine Seite, für den nächtlichen Volltest (`A11Y_SITEMAP=true`).
+- **PR-Kommentar** mit Vergleich zum letzten Stand von `main` („+neu / −behoben“).
+- **Code Scanning:** Befunde als SARIF.
+
+### 4. Geschwindigkeit
+
+Ein Test pro Seite und Zustand; die Seite wird einmal geladen, alle zustandsneutralen Prüfungen laufen darauf. 4 parallele Worker in der CI, Cache für npm und Browser. 8 Seitenvarianten (desktop + mobil) laufen in rund 33 Sekunden.
 
 ## Bewertung und Bericht
 
@@ -192,5 +229,10 @@ Was Claude nicht leisten kann: echte Screenreader-Ausgabe (NVDA, JAWS, VoiceOver
 
 - [ ] Axe Accessibility aktivieren (Mindestausstattung)
 - [ ] Optional: eaa-audit und WebAbility aktivieren
-- [ ] Ersten Durchlauf an einer Pilotseite fahren, Katalog anpassen
-- [x] Supertest als eigenen Skill speichern, damit er mit einem Befehl wiederholbar ist (`.claude/skills/a11y-supertest`)
+- [ ] Repository-Variable `A11Y_BASE_URL` setzen (optional `A11Y_SITEMAP=true`)
+- [ ] Seiten und Zustände der echten Website in `a11y.config.ts` eintragen
+- [ ] Ersten Durchlauf fahren, ARIA-Snapshots erzeugen (`npm run snapshots:update`) und einchecken
+- [ ] Altfehler mit `npm run baseline -- --ticket <ID>` erfassen, Tickets anlegen
+- [ ] Kandidaten aus dem ersten Bericht manuell bewerten, Katalog anpassen
+- [x] Supertest als eigenen Skill speichern (`.claude/skills/a11y-supertest`)
+- [x] Automatisierung, Selbsttest, Baseline, Sitemap, PR-Vergleich (PR #1, PR #2)
