@@ -1,0 +1,23 @@
+# Kontrollierte Updates: neue Playwright-/axe-Versionen kommen als eigener PR,
+# der Supertest und Selbsttest laufen dort, bevor etwas in main landet.
+# Achtung: Eine neue Playwright-Version kann ARIA-Snapshots verändern –
+# dann im PR `npm run snapshots:update` ausführen und prüfen.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      playwright:
+        patterns: ['@playwright/*', 'playwright*']
+      axe:
+        patterns: ['@axe-core/*', 'axe-core']
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

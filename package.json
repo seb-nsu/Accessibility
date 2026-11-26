@@ -1,6 +1,6 @@
 {
   "name": "a11y-supertest",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Barrierefreiheits-Supertest: WCAG 2.2 AA / EN 301 549 für Quellcode und Live-Websites",
   "type": "module",
@@ -9,13 +9,13 @@
   },
   "scripts": {
     "test": "playwright test",
-    "test:axe": "playwright test tests/01-axe.spec.ts",
-    "test:tastatur": "playwright test tests/02-tastatur.spec.ts",
-    "test:ohne-snapshots": "playwright test --grep-invert \"ARIA-Snapshot\"",
+    "test:desktop": "playwright test --project=desktop",
     "report": "node scripts/report.ts",
     "supertest": "playwright test; node scripts/report.ts",
-    "selbsttest": "A11Y_PAGES=/kaputt.html playwright test --grep-invert \"ARIA-Snapshot\"; node scripts/report.ts",
-    "snapshots:update": "playwright test tests/05-aria-snapshot.spec.ts --update-snapshots",
+    "selbsttest": "A11Y_PAGES=/kaputt.html,/ A11Y_PRUEFUNGEN=axe,formulare,kontrast,tastatur,hover,eingabe,layout,darstellung playwright test; node scripts/report.ts && node scripts/selbsttest-pruefen.ts",
+    "snapshots:update": "A11Y_PRUEFUNGEN=snapshot playwright test --project=desktop --update-snapshots",
+    "baseline": "node scripts/baseline.ts",
+    "sitemap": "node scripts/sitemap.ts",
     "demo": "node scripts/serve-demo.mjs"
   },
   "devDependencies": {

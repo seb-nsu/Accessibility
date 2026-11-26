@@ -1,0 +1,28 @@
+- link "Zum Inhalt springen":
+  - /url: "#inhalt"
+- banner:
+  - link "Startseite":
+    - /url: /
+  - button "Menü"
+  - navigation "Hauptnavigation"
+- main:
+  - heading "Unterseite" [level=1]
+  - paragraph: Zweite Seite mit gleicher Kopf- und Fußzeile. Damit prüft der Supertest, ob die Hilfe überall an derselben Stelle steht (WCAG 3.2.6).
+  - table "Öffnungszeiten":
+    - caption: Öffnungszeiten
+    - rowgroup:
+      - row "Tag Zeit":
+        - columnheader "Tag"
+        - columnheader "Zeit"
+    - rowgroup:
+      - row /Montag bis Freitag 9 bis \d+ Uhr/:
+        - rowheader "Montag bis Freitag"
+        - cell /9 bis \d+ Uhr/
+      - row /Samstag \d+ bis \d+ Uhr/:
+        - rowheader "Samstag"
+        - cell /\d+ bis \d+ Uhr/
+- contentinfo:
+  - paragraph:
+    - text: © Beispiel GmbH ·
+    - link "Hilfe per E-Mail":
+      - /url: mailto:hilfe@beispiel.de

@@ -1,0 +1,49 @@
+- link "Zum Inhalt springen":
+  - /url: "#inhalt"
+- banner:
+  - link "Startseite":
+    - /url: /
+  - button "Menü"
+  - navigation "Hauptnavigation"
+- main:
+  - heading "Barrierefreie Beispielseite" [level=1]
+  - paragraph: Diese Seite dient als Referenz für den Supertest. Sie sollte alle automatischen Prüfungen bestehen.
+  - heading "Leistungen" [level=2]
+  - img "Blaue Fläche als Platzhalter für ein Produktbild"
+  - list:
+    - listitem: Beratung
+    - listitem: Umsetzung
+    - listitem:
+      - text: Prüfung nach WCAG 2.2 AA
+      - button "Was ist das?"
+  - paragraph:
+    - text: Sortierung
+    - combobox "Sortierung":
+      - option "Neueste zuerst" [selected]
+      - option "Älteste zuerst"
+  - paragraph:
+    - button "Newsletter abonnieren"
+  - dialog "Newsletter":
+    - heading "Newsletter" [level=2]
+    - text: E-Mail
+    - textbox "E-Mail"
+    - paragraph:
+      - button "Abonnieren"
+      - button "Abbrechen"
+  - heading "Kontakt" [level=2]
+  - text: Name (Pflichtfeld)
+  - textbox "Name (Pflichtfeld)"
+  - text: E-Mail (Pflichtfeld)
+  - textbox "E-Mail (Pflichtfeld)"
+  - text: Passwort
+  - textbox "Passwort"
+  - text: Nachricht
+  - textbox "Nachricht"
+  - paragraph:
+    - button "Absenden"
+  - status
+- contentinfo:
+  - paragraph:
+    - text: © Beispiel GmbH ·
+    - link "Hilfe per E-Mail":
+      - /url: mailto:hilfe@beispiel.de

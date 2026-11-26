@@ -6,29 +6,48 @@
   <title>Demo – absichtlich fehlerhafte Seite</title>
   <!--
     Diese Seite enthält ABSICHTLICH Barrieren. Sie dient dem Selbsttest:
-    npm run selbsttest  →  muss Befunde liefern und fehlschlagen.
+    npm run selbsttest  →  prüft, dass alle erwarteten Befunde gefunden werden
+    (Liste: tests/selbsttest.erwartet.json).
   -->
   <style>
-    body { margin: 0; font-family: sans-serif; }
+    body { margin: 0; font-family: sans-serif; background: #fff; color: #111; }
     .breit { width: 900px; }
     .blass { color: #b5b5b5; }
     button:focus, a:focus { outline: none; }
+    /* Fokus nur per box-shadow: verschwindet im Kontrastmodus */
+    .schatten:focus { box-shadow: 0 0 0 3px #0b5cad; }
+    /* Fokus kaum sichtbar: 1px fast weiß */
+    .schwach:focus { outline: 1px solid #f2f2f2; outline-offset: 0; }
     .karte { height: 2.6em; overflow: hidden; width: 14em; line-height: 1.2; }
     .banner { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #222; color: #fff; padding: 1rem; }
     .fake-button { display: inline-block; padding: 0.5rem; background: #ddd; cursor: pointer; }
     .lang { height: 1400px; }
+    .rahmenlos { border: 1px solid #e6e6e6; background: #fff; }
+    /* Tooltip nur per JS-mouseenter, ohne Esc, verschwindet beim Verlassen des Auslösers */
+    .tipp { display: none; position: absolute; background: #333; color: #fff; padding: 0.25rem; margin-top: 2.2rem; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #222; color: #444; }
+    }
   </style>
 </head>
 <body>
   <div class="breit">
+    <p><a href="mailto:hilfe@beispiel.de">Hilfe</a></p>
     <h1>Fehlerhafte Beispielseite</h1>
     <p class="blass">Dieser Text hat zu wenig Kontrast.</p>
     <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='80'/%3E" width="200" height="80">
     <p><button>Ohne Fokusrahmen</button> <a href="#x">Link ohne Fokusrahmen</a></p>
+    <p><button class="schatten" style="outline:none">Nur Schatten-Fokus</button> <button class="schwach">Schwacher Fokus</button></p>
     <p><span class="fake-button" onclick="alert('geklickt')">Absenden (div-Button)</span></p>
+    <p><button id="tipp-knopf" aria-describedby="tipp">Info</button><span id="tipp" class="tipp">Hinweis ohne Esc</span></p>
     <div class="karte">Dieser Text passt knapp in die Karte hinein.</div>
     <input type="text" placeholder="Feld ohne Label">
+    <input type="text" class="rahmenlos" aria-label="Feld ohne erkennbaren Rahmen">
     <input type="password" onpaste="return false" placeholder="Passwort">
+    <select aria-label="Sprache" onchange="location.href='/unterseite.html'">
+      <option>Deutsch</option>
+      <option>English</option>
+    </select>
     <div class="lang"></div>
     <p><a href="#unten-1">Link unter dem Banner 1</a></p>
     <p><a href="#unten-2">Link unter dem Banner 2</a></p>
@@ -40,6 +59,10 @@
     document.getElementById('falle').addEventListener('keydown', (e) => {
       if (e.key === 'Tab') e.preventDefault();
     });
+    const k = document.getElementById('tipp-knopf');
+    const t = document.getElementById('tipp');
+    k.addEventListener('mouseenter', () => { t.style.display = 'block'; });
+    k.addEventListener('mouseleave', () => { t.style.display = 'none'; });
   </script>
 </body>
 </html>

@@ -1,11 +1,14 @@
-// Erzeugt reports/bericht.md aus den Rohbefunden der Tests (reports/raw/*.json).
+// Erzeugt aus den Rohbefunden (reports/raw/*.json):
+//   reports/bericht.md     lesbarer Bericht
+//   reports/ergebnis.json  alle Befunde mit Schlüssel (für den PR-Vergleich, scripts/delta.ts)
+//   reports/a11y.sarif     für GitHub Code Scanning
 // Aufruf: node scripts/report.ts   (Node ≥ 22.18, Typen werden nativ entfernt)
 import fs from 'node:fs';
 import path from 'node:path';
 import { KRITERIEN, enKlausel } from '../tests/helpers/wcag.ts';
 
 type Schweregrad = 'Kritisch' | 'Hoch' | 'Mittel' | 'Gering';
-interface Befund {
+export interface Befund {
   kriterium: string;
   titel: string;
   schweregrad: Schweregrad;
@@ -16,18 +19,27 @@ interface Befund {
   problem: string;
   behebung?: string;
   hilfe?: string;
+  baseline?: { ticket: string; bis: string; abgelaufen: boolean; grund?: string };
 }
 interface Ergebnis {
   seite: string;
+  projekt: string;
   url: string;
   pruefung: string;
   geprueft: string[];
   befunde: Befund[];
+  extras?: Record<string, unknown>;
+}
+export interface Eintrag extends Befund {
+  seite: string;
+  schluessel: string;
+  blockierend: boolean;
 }
 
 const REIHE: Schweregrad[] = ['Kritisch', 'Hoch', 'Mittel', 'Gering'];
-const rawDir = path.join(process.cwd(), 'reports', 'raw');
-const ziel = path.join(process.cwd(), 'reports', 'bericht.md');
+const BLOCKIEREND: Schweregrad[] = ['Kritisch', 'Hoch'];
+const reports = path.join(process.cwd(), 'reports');
+const rawDir = path.join(reports, 'raw');
 
 if (!fs.existsSync(rawDir)) {
   console.error('Keine Rohbefunde gefunden (reports/raw). Zuerst "npm test" ausführen.');
@@ -41,119 +53,216 @@ const ergebnisse: Ergebnis[] = fs
 
 const kName = (k: string) => (KRITERIEN[k] ? `${k} ${KRITERIEN[k].name} (${KRITERIEN[k].stufe})` : k);
 const esc = (s = '') => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+const seitenName = (e: { seite: string; projekt?: string }) =>
+  e.projekt && e.projekt !== 'desktop' ? `${e.seite} (${e.projekt})` : e.seite;
+const istBlockierend = (b: Befund) =>
+  b.art === 'automatisch' && BLOCKIEREND.includes(b.schweregrad) && !(b.baseline && !b.baseline.abgelaufen);
 
-// Nach Seite gruppieren
+// ---------- Nach Seite gruppieren ----------
 const seiten = new Map<string, { url: string; geprueft: Set<string>; befunde: Befund[] }>();
 for (const e of ergebnisse) {
-  const s = seiten.get(e.seite) ?? { url: e.url, geprueft: new Set<string>(), befunde: [] };
+  const name = seitenName(e);
+  const s = seiten.get(name) ?? { url: e.url, geprueft: new Set<string>(), befunde: [] };
   e.geprueft.forEach((k) => s.geprueft.add(k));
   s.befunde.push(...e.befunde);
-  seiten.set(e.seite, s);
+  seiten.set(name, s);
 }
 
-// Doppelte Befunde (gleiches Kriterium, Element, Titel) zusammenführen – Phase 3 "Abgleich"
-const schluessel = (b: Befund) => `${b.kriterium}|${b.element ?? ''}|${b.titel}|${b.art}`;
-for (const s of seiten.values()) {
+// ---------- 3.2.6 Konsistente Hilfe (seitenübergreifend) ----------
+type Hilfe = { name: string; href: string; bereich: string; selektor: string };
+const strukturen = ergebnisse.filter((e) => e.pruefung === 'struktur');
+const proZiel = new Map<string, { seite: string; bereich: string; url: string; selektor: string; name: string }[]>();
+for (const e of strukturen) {
+  for (const h of (e.extras?.hilfe as Hilfe[] | undefined) ?? []) {
+    const ziel = (h.href || h.name).toLowerCase();
+    const liste = proZiel.get(ziel) ?? [];
+    liste.push({ seite: seitenName(e), bereich: h.bereich, url: e.url, selektor: h.selektor, name: h.name });
+    proZiel.set(ziel, liste);
+  }
+}
+const pfade = new Set(strukturen.map((e) => new URL(e.url).pathname));
+if (pfade.size >= 2) {
+  for (const s of seiten.values()) s.geprueft.add('3.2.6');
+  for (const [ziel, liste] of proZiel) {
+    const bereiche = new Set(liste.map((l) => l.bereich));
+    if (bereiche.size < 2) continue;
+    const verteilung = [...bereiche].map((b) => `${b}: ${liste.filter((l) => l.bereich === b).map((l) => l.seite).join(', ')}`).join(' · ');
+    for (const l of liste) {
+      seiten.get(l.seite)?.befunde.push({
+        kriterium: '3.2.6',
+        titel: 'Hilfe nicht überall an derselben Stelle',
+        schweregrad: 'Mittel',
+        art: 'kandidat',
+        quelle: 'bericht (seitenübergreifend)',
+        url: l.url,
+        element: l.selektor,
+        problem: `Hilfe „${l.name || ziel}“ steht je nach Seite in unterschiedlichen Bereichen – ${verteilung}.`,
+        behebung: 'Hilfe-Link/Kontakt in einer gemeinsamen Layout-Komponente an fester Position ausgeben.',
+      });
+    }
+  }
+}
+
+// ---------- Doppelte Befunde zusammenführen (Phase 3 "Abgleich") ----------
+const schluessel = (seite: string, b: Befund) => `${seite}|${b.kriterium}|${b.element ?? ''}|${b.titel}|${b.art}`;
+for (const [name, s] of seiten) {
   const m = new Map<string, Befund>();
   for (const b of s.befunde) {
-    const vorhanden = m.get(schluessel(b));
-    if (!vorhanden) m.set(schluessel(b), b);
+    const k = schluessel(name, b);
+    const vorhanden = m.get(k);
+    if (!vorhanden) m.set(k, b);
     else if (!vorhanden.quelle.includes(b.quelle)) vorhanden.quelle += ` + ${b.quelle}`;
   }
   s.befunde = [...m.values()];
 }
 
-const zeilen: string[] = [];
+const alle: Eintrag[] = [...seiten].flatMap(([seite, s]) =>
+  s.befunde.map((b) => ({ ...b, seite, schluessel: schluessel(seite, b), blockierend: istBlockierend(b) })),
+);
+
+// ---------- Markdown ----------
+const z: string[] = [];
 const heute = new Date().toISOString().slice(0, 10);
-zeilen.push('# Barrierefreiheits-Bericht', '');
-zeilen.push(`Stand: ${heute} · Maßstab: WCAG 2.2 Stufe AA / EN 301 549 Kap. 9 · Ziel: ${[...seiten.values()][0]?.url ?? '–'}`, '');
-zeilen.push(
-  '> Automatischer Teil des Supertests (Phasen 2–3). Ein „Konform“ gilt erst, wenn auch die Kandidaten und die manuelle Prüfliste (unten) abgearbeitet sind.',
+z.push('# Barrierefreiheits-Bericht', '');
+z.push(`Stand: ${heute} · Maßstab: WCAG 2.2 Stufe AA / EN 301 549 Kap. 9 · Ziel: ${[...seiten.values()][0]?.url ?? '–'}`, '');
+z.push(
+  '> Automatischer Teil des Supertests. Ein „Konform“ gilt erst, wenn auch die Kandidaten und die manuelle Prüfliste (unten) abgearbeitet sind.',
   '',
 );
 
-// Übersicht
-zeilen.push('## Übersicht', '');
-zeilen.push('| Seite | Ergebnis | Kritisch | Hoch | Mittel | Gering | Kandidaten | Kriterien bestanden / geprüft |');
-zeilen.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+z.push('## Übersicht', '');
+z.push('| Seite | Ergebnis | Kritisch | Hoch | Mittel | Gering | Kandidaten | Baseline | Kriterien bestanden / geprüft |');
+z.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
 let gesamtBlockierend = 0;
 for (const [name, s] of seiten) {
-  const sicher = s.befunde.filter((b) => b.art === 'automatisch');
-  const zahl = (g: Schweregrad) => sicher.filter((b) => b.schweregrad === g).length;
+  const offen = s.befunde.filter((b) => b.art === 'automatisch' && !(b.baseline && !b.baseline.abgelaufen));
+  const zahl = (g: Schweregrad) => offen.filter((b) => b.schweregrad === g).length;
   const kandidaten = s.befunde.filter((b) => b.art === 'kandidat').length;
-  const verletzt = new Set(sicher.map((b) => b.kriterium).filter((k) => KRITERIEN[k]));
+  const baseline = s.befunde.filter((b) => b.baseline && !b.baseline.abgelaufen).length;
+  const verletzt = new Set(offen.map((b) => b.kriterium).filter((k) => KRITERIEN[k]));
   const geprueft = [...s.geprueft].filter((k) => KRITERIEN[k]);
   const bestanden = geprueft.filter((k) => !verletzt.has(k)).length;
   const blockierend = zahl('Kritisch') + zahl('Hoch');
   gesamtBlockierend += blockierend;
   const ergebnis = blockierend
     ? '❌ Nicht konform'
-    : sicher.length
+    : offen.length
       ? '⚠️ Teilweise konform'
       : kandidaten
         ? '🔍 Automatisch ok, Kandidaten offen'
         : '✅ Automatisch ok';
-  zeilen.push(
-    `| ${esc(name)} | ${ergebnis} | ${zahl('Kritisch')} | ${zahl('Hoch')} | ${zahl('Mittel')} | ${zahl('Gering')} | ${kandidaten} | ${bestanden} / ${geprueft.length} |`,
+  z.push(
+    `| ${esc(name)} | ${ergebnis} | ${zahl('Kritisch')} | ${zahl('Hoch')} | ${zahl('Mittel')} | ${zahl('Gering')} | ${kandidaten} | ${baseline} | ${bestanden} / ${geprueft.length} |`,
   );
 }
-zeilen.push('');
+z.push('');
 
-// Sichere Befunde
-zeilen.push('## Befunde', '');
+z.push('## Befunde', '');
 let nr = 0;
 let irgendeiner = false;
 for (const grad of REIHE) {
-  const liste = [...seiten].flatMap(([seite, s]) =>
-    s.befunde.filter((b) => b.art === 'automatisch' && b.schweregrad === grad).map((b) => ({ seite, b })),
-  );
+  const liste = alle.filter((b) => b.art === 'automatisch' && b.schweregrad === grad && !(b.baseline && !b.baseline.abgelaufen));
   if (!liste.length) continue;
   irgendeiner = true;
-  zeilen.push(`### ${grad} (${liste.length})`, '');
-  for (const { seite, b } of liste) {
+  z.push(`### ${grad} (${liste.length})`, '');
+  for (const b of liste) {
     nr++;
     const en = enKlausel(b.kriterium);
-    zeilen.push(`#### B${String(nr).padStart(3, '0')} ${b.titel}`, '');
-    zeilen.push(`- WCAG: ${kName(b.kriterium)}${en ? ` · EN 301 549: ${en}` : ''}`);
-    zeilen.push(`- Schweregrad: ${b.schweregrad}`);
-    zeilen.push(`- Seite: ${seite} – ${b.url}`);
-    if (b.element) zeilen.push(`- Element: \`${b.element}\``);
-    zeilen.push(`- Fundort Code: _offen – im Abgleich ergänzen_`);
-    zeilen.push(`- Quelle: ${b.quelle}`);
-    zeilen.push(`- Problem: ${b.problem}`);
-    if (b.behebung) zeilen.push(`- Behebung: ${b.behebung}`);
-    if (b.hilfe) zeilen.push(`- Mehr: ${b.hilfe}`);
-    zeilen.push('- Re-Test: offen', '');
+    z.push(`#### B${String(nr).padStart(3, '0')} ${b.titel}`, '');
+    z.push(`- WCAG: ${kName(b.kriterium)}${en ? ` · EN 301 549: ${en}` : ''}`);
+    z.push(`- Schweregrad: ${b.schweregrad}`);
+    z.push(`- Seite: ${b.seite} – ${b.url}`);
+    if (b.element) z.push(`- Element: \`${b.element}\``);
+    z.push('- Fundort Code: _offen – im Abgleich ergänzen_');
+    z.push(`- Quelle: ${b.quelle}`);
+    z.push(`- Problem: ${b.problem}`);
+    if (b.behebung) z.push(`- Behebung: ${b.behebung}`);
+    if (b.hilfe) z.push(`- Mehr: ${b.hilfe}`);
+    if (b.baseline?.abgelaufen) z.push(`- ⚠️ Baseline ${b.baseline.ticket} ist am ${b.baseline.bis} abgelaufen – blockiert wieder.`);
+    z.push('- Re-Test: offen', '');
   }
 }
-if (!irgendeiner) zeilen.push('Keine sicheren Befunde.', '');
+if (!irgendeiner) z.push('Keine offenen sicheren Befunde.', '');
 
-// Kandidaten
-const kandidaten = [...seiten].flatMap(([seite, s]) =>
-  s.befunde.filter((b) => b.art === 'kandidat').map((b) => ({ seite, b })),
-);
-zeilen.push('## Zur manuellen Prüfung (Kandidaten)', '');
-if (kandidaten.length) {
-  zeilen.push('Verdachtsfälle der Skripte. Ein Mensch entscheidet: echter Befund oder kein Problem.', '');
-  zeilen.push('| Seite | Kriterium | Hinweis | Element | Quelle |');
-  zeilen.push('| --- | --- | --- | --- | --- |');
-  for (const { seite, b } of kandidaten) {
-    zeilen.push(`| ${esc(seite)} | ${esc(kName(b.kriterium))} | ${esc(b.titel)}: ${esc(b.problem)} | ${b.element ? `\`${esc(b.element)}\`` : '–'} | ${esc(b.quelle)} |`);
+const bekannt = alle.filter((b) => b.baseline && !b.baseline.abgelaufen);
+z.push('## Bekannte Befunde (Baseline)', '');
+if (bekannt.length) {
+  z.push('Toleriert bis zum angegebenen Datum, blockieren den Build nicht. Verwaltung in `a11y-baseline.json`.', '');
+  z.push('| Seite | Kriterium | Titel | Element | Ticket | bis |');
+  z.push('| --- | --- | --- | --- | --- | --- |');
+  for (const b of bekannt) {
+    z.push(`| ${esc(b.seite)} | ${esc(kName(b.kriterium))} | ${esc(b.titel)} | ${b.element ? `\`${esc(b.element)}\`` : '–'} | ${esc(b.baseline!.ticket)} | ${b.baseline!.bis} |`);
   }
 } else {
-  zeilen.push('Keine Kandidaten.');
+  z.push('Keine.');
 }
-zeilen.push('');
+z.push('');
 
-// Manuelle Restliste
+const kandidaten = alle.filter((b) => b.art === 'kandidat');
+z.push('## Zur manuellen Prüfung (Kandidaten)', '');
+if (kandidaten.length) {
+  z.push('Verdachtsfälle der Skripte. Ein Mensch entscheidet: echter Befund oder kein Problem.', '');
+  z.push('| Seite | Kriterium | Schweregrad | Hinweis | Element | Quelle |');
+  z.push('| --- | --- | --- | --- | --- | --- |');
+  for (const b of kandidaten) {
+    z.push(
+      `| ${esc(b.seite)} | ${esc(kName(b.kriterium))} | ${b.schweregrad} | ${esc(b.titel)}: ${esc(b.problem)} | ${b.element ? `\`${esc(b.element)}\`` : '–'} | ${esc(b.quelle)} |`,
+    );
+  }
+} else {
+  z.push('Keine Kandidaten.');
+}
+z.push('');
+
 const abgedeckt = new Set([...seiten.values()].flatMap((s) => [...s.geprueft]));
-const offen = Object.keys(KRITERIEN).filter((k) => !abgedeckt.has(k));
-zeilen.push('## Bleibt manuell', '');
-zeilen.push('Diese Kriterien hat kein Skript abgedeckt. Prüfung im Volltest bzw. für neue/geänderte Komponenten:', '');
-for (const k of offen) zeilen.push(`- [ ] ${kName(k)}`);
-zeilen.push('- [ ] Kritische Abläufe einmal mit Screenreader (NVDA/VoiceOver) durchspielen');
-zeilen.push('- [ ] Alt-Texte, Linktexte, Fehlermeldungen inhaltlich bewerten (KI-Vorprüfung + Bestätigung)', '');
+z.push('## Bleibt manuell', '');
+z.push('Diese Kriterien hat kein Skript abgedeckt. Prüfung im Volltest bzw. für neue/geänderte Komponenten:', '');
+for (const k of Object.keys(KRITERIEN).filter((k) => !abgedeckt.has(k))) z.push(`- [ ] ${kName(k)}`);
+z.push('- [ ] Kritische Abläufe einmal mit Screenreader (NVDA/VoiceOver) durchspielen');
+z.push('- [ ] Alt-Texte, Linktexte, Fehlermeldungen inhaltlich bewerten (KI-Vorprüfung + Bestätigung)', '');
 
-fs.mkdirSync(path.dirname(ziel), { recursive: true });
-fs.writeFileSync(ziel, zeilen.join('\n'));
-console.log(`Bericht geschrieben: ${path.relative(process.cwd(), ziel)} (${gesamtBlockierend} blockierende Befunde)`);
+fs.mkdirSync(reports, { recursive: true });
+fs.writeFileSync(path.join(reports, 'bericht.md'), z.join('\n'));
+fs.writeFileSync(
+  path.join(reports, 'ergebnis.json'),
+  JSON.stringify({ stand: new Date().toISOString(), blockierend: gesamtBlockierend, befunde: alle }, null, 2),
+);
+
+// ---------- SARIF 2.1.0 für GitHub Code Scanning ----------
+// Live-Befunde haben keine Quelltextstelle; sie werden der Seitenkonfiguration
+// (a11y.config.ts) zugeordnet. URL und Selektor stehen in der Meldung.
+const regeln = new Map<string, { id: string; name: string; helpUri?: string }>();
+const level = (b: Eintrag) => (b.art === 'kandidat' ? 'note' : BLOCKIEREND.includes(b.schweregrad) ? 'error' : 'warning');
+const sarif = {
+  $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+  version: '2.1.0',
+  runs: [
+    {
+      tool: { driver: { name: 'a11y-supertest', informationUri: 'https://www.w3.org/TR/WCAG22/', rules: [] as unknown[] } },
+      results: alle
+        .filter((b) => !(b.baseline && !b.baseline.abgelaufen))
+        .map((b) => {
+          const id = `WCAG-${b.kriterium}`;
+          if (!regeln.has(id)) regeln.set(id, { id, name: KRITERIEN[b.kriterium]?.name ?? b.kriterium, helpUri: b.hilfe });
+          return {
+            ruleId: id,
+            level: level(b),
+            message: {
+              text: `[${b.schweregrad}${b.art === 'kandidat' ? ', Kandidat' : ''}] ${b.titel} – ${b.seite} (${b.url})${b.element ? ` · ${b.element}` : ''}: ${b.problem}`,
+            },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'a11y.config.ts' }, region: { startLine: 1 } } }],
+            partialFingerprints: { a11y: b.schluessel },
+          };
+        }),
+    },
+  ],
+};
+sarif.runs[0].tool.driver.rules = [...regeln.values()].map((r) => ({
+  id: r.id,
+  name: r.name.replace(/[^\w]+/g, ''),
+  shortDescription: { text: `WCAG ${r.id.slice(5)} ${r.name}` },
+  ...(r.helpUri ? { helpUri: r.helpUri } : {}),
+}));
+fs.writeFileSync(path.join(reports, 'a11y.sarif'), JSON.stringify(sarif, null, 2));
+
+console.log(`Bericht geschrieben: reports/bericht.md (${gesamtBlockierend} blockierende Befunde, ${kandidaten.length} Kandidaten)`);

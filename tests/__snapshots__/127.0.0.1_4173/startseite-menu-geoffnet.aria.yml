@@ -10,11 +10,11 @@
         - link "Leistungen":
           - /url: "#leistungen"
       - listitem:
+        - link "Unterseite":
+          - /url: /unterseite.html
+      - listitem:
         - link "Kontakt":
           - /url: "#kontakt"
-      - listitem:
-        - link "Hilfe":
-          - /url: "#hilfe"
 - main:
   - heading "Barrierefreie Beispielseite" [level=1]
   - paragraph: Diese Seite dient als Referenz für den Supertest. Sie sollte alle automatischen Prüfungen bestehen.
@@ -23,7 +23,16 @@
   - list:
     - listitem: Beratung
     - listitem: Umsetzung
-    - listitem: Prüfung nach WCAG 2.2 AA
+    - listitem:
+      - text: Prüfung nach WCAG 2.2 AA
+      - button "Was ist das?"
+  - paragraph:
+    - text: Sortierung
+    - combobox "Sortierung":
+      - option "Neueste zuerst" [selected]
+      - option "Älteste zuerst"
+  - paragraph:
+    - button "Newsletter abonnieren"
   - heading "Kontakt" [level=2]
   - text: Name (Pflichtfeld)
   - textbox "Name (Pflichtfeld)"
@@ -36,14 +45,8 @@
   - paragraph:
     - button "Absenden"
   - status
-  - heading "Hilfe" [level=2]
-  - paragraph:
-    - text: Fragen?
-    - link "Schreiben Sie uns eine E-Mail an hilfe@beispiel.de":
-      - /url: mailto:hilfe@beispiel.de
-    - text: .
 - contentinfo:
   - paragraph:
     - text: © Beispiel GmbH ·
-    - link "Hilfe":
-      - /url: "#hilfe"
+    - link "Hilfe per E-Mail":
+      - /url: mailto:hilfe@beispiel.de

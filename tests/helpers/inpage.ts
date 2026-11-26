@@ -138,6 +138,12 @@ export function installA11yHelpers() {
         (el.getAttribute('href') || '').length > 1 &&
         !!document.getElementById(decodeURIComponent((el.getAttribute('href') || '').slice(1))),
       inMain: !!el.closest('main,[role="main"]'),
+      // Fokus in einem modalen Dialog darf (und soll) dort bleiben
+      modal: (() => {
+        const m = el.closest('[aria-modal="true"],dialog[open]');
+        return m ? selektor(m) : null;
+      })(),
+      url: location.href,
     };
   };
 
@@ -220,7 +226,151 @@ export function installA11yHelpers() {
     });
   };
 
+  // ---------- Farben und Kontrast ----------
+  type RGBA = [number, number, number, number];
+  const farbe = (s: string): RGBA | null => {
+    const m = /rgba?\(([^)]+)\)/.exec(s);
+    if (!m) return null;
+    const t = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    return [t[0], t[1], t[2], t.length > 3 ? t[3] : 1];
+  };
+  const luminanz = ([r, g, b]: RGBA) => {
+    const k = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * k(r) + 0.7152 * k(g) + 0.0722 * k(b);
+  };
+  const kontrast = (a: RGBA, b: RGBA) => {
+    const [h, d] = [luminanz(a), luminanz(b)].sort((x, y) => y - x);
+    return (h + 0.05) / (d + 0.05);
+  };
+  const mischen = (oben: RGBA, unten: RGBA): RGBA => {
+    const a = oben[3];
+    return [0, 1, 2].map((i) => oben[i] * a + unten[i] * (1 - a)).concat(1) as RGBA;
+  };
+  /** Effektive Hintergrundfarbe (Bilder/Verläufe werden ignoriert → null) */
+  const hintergrund = (el: Element | null): RGBA | null => {
+    const stapel: RGBA[] = [];
+    for (let e = el; e; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+      const c = farbe(cs.backgroundColor);
+      if (c && c[3] > 0) {
+        stapel.push(c);
+        if (c[3] >= 1) break;
+      }
+    }
+    let ergebnis: RGBA = [255, 255, 255, 1];
+    for (const c of stapel.reverse()) ergebnis = mischen(c, ergebnis);
+    return ergebnis;
+  };
+
+  /**
+   * 1.4.11 Nicht-Text-Kontrast: Ist die Begrenzung eines Bedienelements erkennbar?
+   * Erkennbar = Rahmen ODER eigene Fläche mit ≥ 3:1 gegen die Umgebung.
+   */
+  const nichtTextKontrast = () => {
+    const sel =
+      'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):not([type=image]),select,textarea';
+    const treffer: { selektor: string; name: string; rahmen: number; flaeche: number }[] = [];
+    for (const el of Array.from(document.querySelectorAll(sel))) {
+      if (!sichtbar(el) || treffer.length >= 25) continue;
+      const cs = getComputedStyle(el);
+      const umgebung = hintergrund(el.parentElement);
+      const eigene = hintergrund(el);
+      if (!umgebung || !eigene) continue;
+      const seiten = ['Top', 'Right', 'Bottom', 'Left'] as const;
+      let rahmen = 1;
+      for (const s of seiten) {
+        const breite = parseFloat(cs.getPropertyValue(`border-${s.toLowerCase()}-width`));
+        const c = farbe(cs.getPropertyValue(`border-${s.toLowerCase()}-color`));
+        if (breite >= 1 && c && c[3] > 0 && cs.getPropertyValue(`border-${s.toLowerCase()}-style`) !== 'none') {
+          rahmen = Math.max(rahmen, kontrast(mischen(c, umgebung), umgebung));
+        }
+      }
+      const flaeche = kontrast(eigene, umgebung);
+      if (rahmen < 3 && flaeche < 3) {
+        treffer.push({ selektor: selektor(el), name: name(el), rahmen: +rahmen.toFixed(2), flaeche: +flaeche.toFixed(2) });
+      }
+    }
+    return treffer;
+  };
+
+  // ---------- Sichtbarkeit vorher/nachher (1.4.13, 4.1.3) ----------
+  let sichtbarVorher = new Set<Element>();
+  const sichtbarMerken = () => {
+    sichtbarVorher = new Set(Array.from(document.body.querySelectorAll('*')).filter((e) => sichtbar(e)));
+    return sichtbarVorher.size;
+  };
+  /** Neu sichtbar gewordene Elemente mit Text (nur die äußersten) */
+  const neuSichtbar = () => {
+    const neu = Array.from(document.body.querySelectorAll('*')).filter(
+      (e) => !sichtbarVorher.has(e) && sichtbar(e) && ((e as HTMLElement).innerText ?? '').trim(),
+    );
+    const aeussere = neu.filter((e) => !neu.some((o) => o !== e && o.contains(e)));
+    return aeussere.slice(0, 5).map((e) => {
+      const r = e.getBoundingClientRect();
+      return {
+        id: idVon(e),
+        selektor: selektor(e),
+        text: ((e as HTMLElement).innerText ?? '').trim().slice(0, 80),
+        live: !!e.closest('[aria-live],[role=alert],[role=status],[role=log]'),
+        x: r.left + r.width / 2,
+        y: r.top + r.height / 2,
+      };
+    });
+  };
+  const istSichtbar = (id: string) => {
+    const el = perId(id);
+    return !!el && sichtbar(el);
+  };
+
+  /** Hover-Kandidaten für 1.4.13: Elemente, die typischerweise Tooltips/Popover auslösen */
+  const hoverZiele = (max: number) => {
+    const sel =
+      '[aria-describedby],[aria-haspopup],[data-tooltip],[data-tip],[data-bs-toggle="tooltip"],[popovertarget],a[href],button';
+    return Array.from(document.querySelectorAll(sel))
+      .filter((e) => sichtbar(e) && !e.closest('[aria-modal="true"],dialog[open]'))
+      .sort((a, b) => Number(b.matches('[aria-describedby],[aria-haspopup],[data-tooltip],[data-tip],[popovertarget]')) - Number(a.matches('[aria-describedby],[aria-haspopup],[data-tooltip],[data-tip],[popovertarget]')))
+      .slice(0, max)
+      .map((e) => ({ id: idVon(e), selektor: selektor(e), name: name(e) }));
+  };
+
+  // ---------- 3.2.6 Konsistente Hilfe ----------
+  const hilfeSignatur = () => {
+    const muster = /hilfe|kontakt|support|faq|help|contact|chat/i;
+    const kandidaten = Array.from(document.querySelectorAll('a[href],button')).filter(
+      (e) =>
+        sichtbar(e) &&
+        (muster.test(name(e)) || /^(mailto|tel):/i.test(e.getAttribute('href') || '')),
+    );
+    // Position relativ zu anderen wiederkehrenden Bereichen: Landmark + Reihenfolge darin
+    return kandidaten.slice(0, 5).map((e) => {
+      const lm = e.closest('header,nav,main,aside,footer,[role=banner],[role=navigation],[role=main],[role=contentinfo]');
+      const bereich = lm ? (lm.getAttribute('role') || lm.tagName.toLowerCase()) : 'body';
+      return { name: name(e), href: e.getAttribute('href') || '', bereich, selektor: selektor(e) };
+    });
+  };
+
+  // ---------- Live-Regionen (4.1.3) ----------
+  const liveTexte = () =>
+    Array.from(document.querySelectorAll('[aria-live],[role=alert],[role=status],[role=log]'))
+      .map((e) => e.textContent?.trim() ?? '')
+      .join('|');
+
   w.__a11y = {
+    nichtTextKontrast,
+    sichtbarMerken,
+    neuSichtbar,
+    istSichtbar,
+    hoverZiele,
+    hilfeSignatur,
+    liveTexte,
+    hintergrundIstDunkel: () => {
+      const c = hintergrund(document.body);
+      return c ? luminanz(c) < 0.2 : false;
+    },
     tabbableAnzahl: () => tabbables().length,
     fokusInfo,
     perId,
@@ -267,5 +417,7 @@ export interface FokusSchritt {
   verdecktDurch?: string;
   skipLink: boolean;
   inMain: boolean;
+  modal: string | null;
+  url: string;
 }
 export type FokusInfo = FokusSchritt | { body: true };

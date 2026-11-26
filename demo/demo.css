@@ -1,0 +1,35 @@
+:root {
+  --text: #1a1a1a; --bg: #ffffff; --akzent: #0b5cad; --fehler: #b00020; --rahmen: #595959;
+  --tipp-bg: #1a1a1a; --tipp-text: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f0f0f0; --bg: #121212; --akzent: #8cc4ff; --fehler: #ff8a80; --rahmen: #a0a0a0;
+    --tipp-bg: #f0f0f0; --tipp-text: #121212;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 1rem/1.5 system-ui, sans-serif; color: var(--text); background: var(--bg); }
+a { color: var(--akzent); text-decoration: underline; }
+/* outline statt box-shadow: bleibt auch im Kontrastmodus (forced-colors) sichtbar */
+:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.skip { position: absolute; left: 0.5rem; top: -3rem; background: var(--bg); padding: 0.5rem 1rem; }
+.skip:focus { top: 0.5rem; }
+header, main, footer { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+header { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; margin: 0; padding: 0; }
+nav ul[hidden] { display: none; }
+button { font: inherit; min-height: 2.75rem; padding: 0.5rem 1rem; border: 2px solid var(--akzent); background: var(--bg); color: var(--akzent); border-radius: 0.25rem; cursor: pointer; }
+label { display: block; font-weight: 600; margin-top: 1rem; }
+input, textarea, select { font: inherit; width: 100%; max-width: 30rem; padding: 0.5rem; border: 2px solid var(--rahmen); border-radius: 0.25rem; color: var(--text); background: var(--bg); }
+[aria-invalid="true"] { border-color: var(--fehler); }
+.fehler { color: var(--fehler); margin: 0.25rem 0 0; }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid var(--rahmen); padding: 0.25rem 0.5rem; text-align: left; }
+dialog { color: var(--text); background: var(--bg); border: 2px solid var(--rahmen); max-width: 24rem; }
+/* Tooltip: per Hover und Fokus, überfahrbar (gemeinsamer Wrapper), per Esc ausblendbar (demo.js) */
+.tipp { position: relative; display: inline-block; }
+.tipp-inhalt { display: none; position: absolute; left: 0; top: 100%; z-index: 1; width: 16rem; padding: 0.5rem; background: var(--tipp-bg); color: var(--tipp-text); border-radius: 0.25rem; }
+.tipp:hover .tipp-inhalt, .tipp:focus-within .tipp-inhalt { display: block; }
+.tipp.aus .tipp-inhalt { display: none; }

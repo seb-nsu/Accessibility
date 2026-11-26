@@ -12,7 +12,8 @@ Grundlagen in diesem Repository:
 - `docs/konzept.md` – Ablauf, Modi, Automatisierung
 - `docs/pruefkatalog.md` – alle Kriterien mit Code-, Live- und Automatisierungsweg
 - `docs/bericht-vorlage.md` – Schweregrade und Befund-Vorlage
-- `tests/` + `npm run supertest` – automatische Prüfungen (axe, Tastatur, Layout, Formulare, Snapshots)
+- `tests/supertest.spec.ts` + `tests/pruefungen/` + `npm run supertest` – automatische Prüfungen (axe desktop/mobil, Tastatur, Hover, Eingabe, Formulare, Layout, Kontrast-/Dunkelmodus, Snapshots)
+- `a11y-baseline.json` – bekannte Altbefunde mit Ticket und Ablaufdatum
 
 ## Phase 1 – Umfang klären
 
@@ -31,6 +32,8 @@ Trage Seiten und Zustände in `a11y.config.ts` ein (`setup` für Zustände).
 **Live**
 
 - Wenn die Shell Netzwerk hat: `BASE_URL=<url> npm run supertest` → `reports/bericht.md`.
+- Viele Seiten: `BASE_URL=<url> npm run sitemap` wählt je Seitenvorlage eine Seite → `A11Y_PAGES_FILE=reports/seiten.json`.
+- Bestehende Website mit vielen Altfehlern: nach dem ersten Lauf `npm run baseline -- --ticket <ID>` vorschlagen, damit nur neue Fehler blockieren. Nie ungefragt Befunde in die Baseline schreiben.
 - Sonst: Axe-Accessibility-Plugin (falls aktiviert) bzw. Claude in Chrome. Im Browser dieselben Prüfungen wie in `tests/helpers/inpage.ts` per JavaScript ausführen (Tab-Durchlauf, Überbreite bei 320 px, Textabstand, Einfügen ins Passwortfeld).
 - Optional WebAbility als zweiten Scanner zum Gegenprüfen.
 
@@ -64,7 +67,7 @@ Für jeden Befund einen konkreten Code-Vorschlag. Nach dem Fix nur die betroffen
 
 ## Phase 7 – CI
 
-Workflow `.github/workflows/barrierefreiheit.yml` aktivieren: Repository-Variable `A11Y_BASE_URL` setzen, ARIA-Snapshots einmal mit `BASE_URL=<url> npm run snapshots:update` erzeugen und einchecken.
+Workflow `.github/workflows/barrierefreiheit.yml` aktivieren: Repository-Variable `A11Y_BASE_URL` setzen (optional `A11Y_SITEMAP=true` für den nächtlichen Volltest), ARIA-Snapshots einmal mit `BASE_URL=<url> npm run snapshots:update` erzeugen und einchecken. Der Workflow kommentiert PRs mit dem Vergleich zu `main`, lädt SARIF ins Code Scanning und prüft per Selbsttest, dass der Test selbst noch funktioniert.
 
 ## Schweregrade (Kurzform)
 
