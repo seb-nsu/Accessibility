@@ -1,0 +1,36 @@
+# Hält package-lock.json passend zu package.json.
+# Läuft, wenn package.json geändert wurde, und committet die aktualisierte Lock-Datei
+# in denselben Branch. Danach installieren alle Workflows reproduzierbar mit `npm ci`.
+name: Lock-Datei
+
+on:
+  push:
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lock-Datei erzeugen
+        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Committen, falls geändert
+        run: |
+          if [ -n "$(git status --porcelain package-lock.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "package-lock.json aktualisieren"
+            git push
+          else
+            echo "Lock-Datei ist aktuell."
+          fi

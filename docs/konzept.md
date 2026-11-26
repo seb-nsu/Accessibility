@@ -57,8 +57,8 @@ flowchart TD
 | --- | --- | --- |
 | Fehler verhindern | Regeln greifen beim Schreiben | [Lint-Vorlagen](../templates/lint/), geprüfte Farb-Tokens |
 | Barrierefreie Komponenten | Einmal gründlich prüfen, danach nur korrekte Verwendung | Komponentenbibliothek + Komponententests mit axe |
-| Manuelles als Skript | Tastatur, Fokus, Reflow, Textabstand, Einfügen werden gemessen | `tests/02-…04-*.spec.ts` |
-| Nur Änderungen prüfen | Tree-Snapshot je Seite/Zustand; Abweichung → Review | `tests/05-aria-snapshot.spec.ts` |
+| Manuelles als Skript | Tastatur, Fokus (mit Kontrast-Schwelle), Reflow, Textabstand, Tooltips, Kontextwechsel, Einfügen, Kontrast- und Dunkelmodus werden gemessen | `tests/pruefungen/*.ts` |
+| Nur Änderungen prüfen | Tree-Snapshot je Seite/Zustand; Baseline für Altfehler; PR-Kommentar mit Vergleich zu `main` | Prüfung `snapshot`, `a11y-baseline.json`, `scripts/delta.ts` |
 
 ### Phase 7: Regressionstest in der CI
 

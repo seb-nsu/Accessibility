@@ -1,0 +1,26 @@
+{
+  "sauber": ["/", "/ (mobil)"],
+  "erwartet": [
+    { "beschreibung": "1.1.1 Bild ohne Alternativtext (axe)", "seite": "/kaputt.html", "quelle": "image-alt" },
+    { "beschreibung": "1.4.3 zu geringer Textkontrast (axe)", "seite": "/kaputt.html", "quelle": "color-contrast", "art": "automatisch" },
+    { "beschreibung": "Feld ohne Label (axe)", "seite": "/kaputt.html", "quelle": "label" },
+    { "beschreibung": "3.1.1 Seite ohne lang (axe)", "seite": "/kaputt.html", "quelle": "html-has-lang" },
+    { "beschreibung": "1.4.3 Kontrast im Dunkelmodus (axe)", "seite": "/kaputt.html", "titel": "Dunkelmodus" },
+    { "beschreibung": "Mobil: axe-Befunde (Pixel 7)", "seite": "/kaputt.html (mobil)", "quelle": "axe-core" },
+    { "beschreibung": "1.4.10 Querscrollen bei 320 px", "seite": "/kaputt.html", "kriterium": "1.4.10", "art": "automatisch" },
+    { "beschreibung": "1.4.11 Eingabefeld ohne erkennbaren Rahmen", "seite": "/kaputt.html", "kriterium": "1.4.11" },
+    { "beschreibung": "1.4.12 Text bei Textabstand abgeschnitten", "seite": "/kaputt.html", "kriterium": "1.4.12" },
+    { "beschreibung": "1.4.13 Tooltip nicht per Esc ausblendbar", "seite": "/kaputt.html", "kriterium": "1.4.13", "titel": "Esc" },
+    { "beschreibung": "1.4.13 Tooltip nicht überfahrbar", "seite": "/kaputt.html", "kriterium": "1.4.13", "titel": "Darüberfahren" },
+    { "beschreibung": "2.1.1 div-Button ohne Tastaturzugang", "seite": "/kaputt.html", "kriterium": "2.1.1" },
+    { "beschreibung": "2.1.2 Tastaturfalle", "seite": "/kaputt.html", "kriterium": "2.1.2", "art": "automatisch" },
+    { "beschreibung": "2.4.1 kein Skip-Link", "seite": "/kaputt.html", "kriterium": "2.4.1" },
+    { "beschreibung": "2.4.7 Fokus unsichtbar", "seite": "/kaputt.html", "kriterium": "2.4.7", "art": "automatisch" },
+    { "beschreibung": "2.4.7 Fokus nur schwach sichtbar", "seite": "/kaputt.html", "kriterium": "2.4.7", "titel": "schwach" },
+    { "beschreibung": "2.4.7 Fokus im Kontrastmodus unsichtbar (nur box-shadow)", "seite": "/kaputt.html", "kriterium": "2.4.7", "titel": "Kontrastmodus" },
+    { "beschreibung": "2.4.11 Fokus vom Banner verdeckt", "seite": "/kaputt.html", "kriterium": "2.4.11", "art": "automatisch" },
+    { "beschreibung": "3.2.2 Auswahl löst Seitenwechsel aus", "seite": "/kaputt.html", "kriterium": "3.2.2" },
+    { "beschreibung": "3.2.6 Hilfe an anderer Stelle als auf /", "seite": "/kaputt.html", "kriterium": "3.2.6" },
+    { "beschreibung": "3.3.8 Einfügen ins Passwortfeld blockiert", "seite": "/kaputt.html", "kriterium": "3.3.8", "art": "automatisch" }
+  ]
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Unterseite – Demo</title>
+  <link rel="stylesheet" href="/demo.css">
+</head>
+<body>
+  <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+  <header>
+    <a href="/">Startseite</a>
+    <button type="button" aria-expanded="false" aria-controls="menue" id="menueknopf">Menü</button>
+    <nav aria-label="Hauptnavigation">
+      <ul id="menue" hidden>
+        <li><a href="/#leistungen">Leistungen</a></li>
+        <li><a href="/unterseite.html" aria-current="page">Unterseite</a></li>
+        <li><a href="/#kontakt">Kontakt</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="inhalt" tabindex="-1">
+    <h1>Unterseite</h1>
+    <p>Zweite Seite mit gleicher Kopf- und Fußzeile. Damit prüft der Supertest, ob die Hilfe überall an derselben Stelle steht (WCAG 3.2.6).</p>
+    <table>
+      <caption>Öffnungszeiten</caption>
+      <thead><tr><th scope="col">Tag</th><th scope="col">Zeit</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Montag bis Freitag</th><td>9 bis 17 Uhr</td></tr>
+        <tr><th scope="row">Samstag</th><td>10 bis 14 Uhr</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+  <footer>
+    <p>© Beispiel GmbH · <a href="mailto:hilfe@beispiel.de">Hilfe per E-Mail</a></p>
+  </footer>
+
+  <script src="/demo.js"></script>
+</body>
+</html>

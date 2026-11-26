@@ -1,7 +1,8 @@
 # Phase 7 des Supertests: Regressionstest in der CI.
 #
-# Ziel-URL: Repository-Variable A11Y_BASE_URL (Settings → Secrets and variables → Actions → Variables)
-# oder beim manuellen Start eingeben. Ohne URL wird die mitgelieferte Demo-Seite geprüft.
+# Repository-Variablen (Settings → Secrets and variables → Actions → Variables):
+#   A11Y_BASE_URL  zu prüfende Website. Leer = mitgelieferte Demo-Seiten.
+#   A11Y_SITEMAP   "true" = nächtlicher Lauf liest die Seiten aus der Sitemap (je Vorlage eine).
 name: Barrierefreiheit
 
 on:
@@ -9,12 +10,16 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 2 * * *' # nächtlich, Volltest aller konfigurierten Seiten
+    - cron: '17 2 * * *' # nächtlich
   workflow_dispatch:
     inputs:
       base_url:
         description: 'Zu prüfende URL (leer = Repository-Variable bzw. Demo)'
         required: false
+      sitemap:
+        description: 'Seiten aus der Sitemap lesen'
+        type: boolean
+        default: false
       formulare_absenden:
         description: 'Formulare leer absenden (nur Staging!)'
         type: boolean
@@ -23,13 +28,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: a11y-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   supertest:
+    name: Supertest
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: write # PR-Kommentar mit dem Vergleich zu main
+      security-events: write # SARIF für Code Scanning
     env:
       BASE_URL: ${{ inputs.base_url || vars.A11Y_BASE_URL }}
       A11Y_FORMS_SUBMIT: ${{ inputs.formulare_absenden && '1' || '0' }}
+      SITEMAP: ${{ (github.event_name == 'schedule' && vars.A11Y_SITEMAP == 'true') || inputs.sitemap }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,14 +52,40 @@ jobs:
         with:
           node-version: 22
 
+      - name: npm-Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
       - name: Abhängigkeiten installieren
-        run: npm install --no-audit --no-fund
+        run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+
+      - name: Browser-Cache
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json', 'package.json') }}
 
       - name: Chromium installieren
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ "${{ steps.browser-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Seiten aus der Sitemap lesen
+        if: env.SITEMAP == 'true' && env.BASE_URL != ''
+        run: |
+          node scripts/sitemap.ts
+          echo "A11Y_PAGES_FILE=reports/seiten.json" >> "$GITHUB_ENV"
+          # Sitemap-Seiten haben keine eingecheckten Snapshots
+          echo "A11Y_PRUEFUNGEN=axe,formulare,kontrast,tastatur,hover,eingabe,layout,darstellung" >> "$GITHUB_ENV"
 
       - name: Supertest ausführen
-        id: tests
         run: npx playwright test
 
       - name: Bericht erzeugen
@@ -52,6 +93,53 @@ jobs:
         run: |
           node scripts/report.ts || true
           if [ -f reports/bericht.md ]; then cat reports/bericht.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      # ---------- Vergleich mit main ----------
+      - name: Stand von main sichern
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && hashFiles('reports/ergebnis.json') != ''
+        run: mkdir -p basis-speicher && cp reports/ergebnis.json basis-speicher/
+
+      - name: Stand von main in den Cache
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && hashFiles('basis-speicher/ergebnis.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: basis-speicher
+          key: a11y-main-${{ github.run_id }}
+
+      - name: Letzten Stand von main holen
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: basis-speicher
+          key: a11y-main-keiner
+          restore-keys: a11y-main-
+
+      - name: Vergleich berechnen
+        if: always() && github.event_name == 'pull_request' && hashFiles('reports/ergebnis.json') != ''
+        run: node scripts/delta.ts reports/ergebnis.json basis-speicher/ergebnis.json
+
+      - name: PR-Kommentar
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && hashFiles('reports/delta.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('reports/delta.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const kommentare = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const alt = kommentare.find((k) => k.body?.includes('<!-- a11y-supertest -->'));
+            if (alt) await github.rest.issues.updateComment({ owner, repo, comment_id: alt.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      # ---------- Code Scanning ----------
+      - name: SARIF hochladen
+        if: always() && hashFiles('reports/a11y.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        continue-on-error: true # Code Scanning muss im Repository verfügbar sein
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/a11y.sarif
+          category: barrierefreiheit
 
       - name: Bericht und Playwright-Report hochladen
         if: always()
@@ -61,5 +149,42 @@ jobs:
           path: |
             reports/
             playwright-report/
-            tests/__snapshots__/
           retention-days: 30
+
+  selbsttest:
+    name: Selbsttest (findet der Test seine eigenen Fehler?)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: ''
+      A11Y_PAGES: /kaputt.html,/
+      A11Y_PRUEFUNGEN: axe,formulare,kontrast,tastatur,hover,eingabe,layout,darstellung
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json', 'package.json') }}
+      - run: |
+          if [ "${{ steps.browser-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Supertest gegen die fehlerhafte Demo-Seite (muss Befunde liefern)
+        run: npx playwright test || true
+      - name: Erwartete Befunde prüfen
+        shell: bash # mit pipefail: ein fehlgeschlagener Selbsttest bricht trotz tee ab
+        run: |
+          node scripts/report.ts
+          node scripts/selbsttest-pruefen.ts | tee -a "$GITHUB_STEP_SUMMARY"
