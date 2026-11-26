@@ -184,6 +184,7 @@ jobs:
       - name: Supertest gegen die fehlerhafte Demo-Seite (muss Befunde liefern)
         run: npx playwright test || true
       - name: Erwartete Befunde prüfen
+        shell: bash # mit pipefail: ein fehlgeschlagener Selbsttest bricht trotz tee ab
         run: |
           node scripts/report.ts
           node scripts/selbsttest-pruefen.ts | tee -a "$GITHUB_STEP_SUMMARY"
