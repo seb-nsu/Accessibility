@@ -14,8 +14,14 @@ Prüft Websites nach **WCAG 2.2 Stufe AA** und ordnet jeden Befund der **EN 301 
 
 ## Schnellstart
 
+**Mit einem Befehl:** `./supertest.sh https://www.example.de` (Windows: `supertest.bat https://www.example.de`, ohne Adresse
+werden die Demo-Seiten geprüft). Beim ersten Mal installiert das Skript Pakete und Chromium; am Ende öffnet sich
+`reports/bericht.html`.
+
+Von Hand:
+
 ```bash
-npm ci                      # bzw. npm install, solange keine package-lock.json existiert
+npm ci
 npx playwright install chromium
 
 npm run supertest           # Demo-Seiten prüfen (startet lokalen Server)
@@ -27,6 +33,7 @@ Ergebnis in `reports/`:
 | Datei | Inhalt |
 | --- | --- |
 | `bericht.md` | Übersicht je Seite, Befunde, bekannte Befunde (Baseline), Kandidaten zur manuellen Prüfung, manuelle Restliste |
+| `bericht.html` | derselbe Bericht als Webseite – per Doppelklick lesbar, auch für Fachfremde |
 | `ergebnis.json` | alle Befunde maschinenlesbar (Grundlage für den PR-Vergleich und die Baseline) |
 | `a11y.sarif` | für GitHub Code Scanning |
 
