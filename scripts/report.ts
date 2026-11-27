@@ -1,11 +1,13 @@
 // Erzeugt aus den Rohbefunden (reports/raw/*.json):
 //   reports/bericht.md     lesbarer Bericht
+//   reports/bericht.html   derselbe Bericht als Webseite (Doppelklick, auch für Fachfremde)
 //   reports/ergebnis.json  alle Befunde mit Schlüssel (für den PR-Vergleich, scripts/delta.ts)
 //   reports/a11y.sarif     für GitHub Code Scanning
 // Aufruf: node scripts/report.ts   (Node ≥ 22.18, Typen werden nativ entfernt)
 import fs from 'node:fs';
 import path from 'node:path';
 import { KRITERIEN, enKlausel } from '../tests/helpers/wcag.ts';
+import { markdownZuHtml } from './html.ts';
 
 type Schweregrad = 'Kritisch' | 'Hoch' | 'Mittel' | 'Gering';
 export interface Befund {
@@ -223,6 +225,7 @@ z.push('- [ ] Alt-Texte, Linktexte, Fehlermeldungen inhaltlich bewerten (KI-Vorp
 
 fs.mkdirSync(reports, { recursive: true });
 fs.writeFileSync(path.join(reports, 'bericht.md'), z.join('\n'));
+fs.writeFileSync(path.join(reports, 'bericht.html'), markdownZuHtml(z.join('\n')));
 fs.writeFileSync(
   path.join(reports, 'ergebnis.json'),
   JSON.stringify({ stand: new Date().toISOString(), blockierend: gesamtBlockierend, befunde: alle }, null, 2),
@@ -265,4 +268,4 @@ sarif.runs[0].tool.driver.rules = [...regeln.values()].map((r) => ({
 }));
 fs.writeFileSync(path.join(reports, 'a11y.sarif'), JSON.stringify(sarif, null, 2));
 
-console.log(`Bericht geschrieben: reports/bericht.md (${gesamtBlockierend} blockierende Befunde, ${kandidaten.length} Kandidaten)`);
+console.log(`Bericht geschrieben: reports/bericht.md und reports/bericht.html (${gesamtBlockierend} blockierende Befunde, ${kandidaten.length} Kandidaten)`);
